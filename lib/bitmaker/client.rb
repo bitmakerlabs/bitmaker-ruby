@@ -7,6 +7,9 @@ require 'jwt'
 
 module Bitmaker
   class Client
+    class MissingClientCredentialsError < RuntimeError; end
+    class AccessTokenDeniedError < RuntimeError; end
+
     IDENTIFIER = 'https://api.bitmaker.co'
     HOST = 'api.bitmaker.co'
     PORT = 443
@@ -27,6 +30,8 @@ module Bitmaker
     def initialize(client_id: nil, client_secret: nil)
       @client_id = client_id || self.class.client_id || ENV['AUTH0_CLIENT_ID']
       @client_secret = client_secret || self.class.client_secret || ENV['AUTH0_CLIENT_SECRET']
+
+      raise MissingClientCredentialsError.new('You must provide a valid client_id and client_secret') if @client_id.nil? && @client_secret.nil?
 
       ensure_valid_access_token
     end
@@ -57,7 +62,13 @@ module Bitmaker
                                     })
 
       response = http.request(request)
-      MultiJson.load(response.read_body)
+      payload = MultiJson.load(response.read_body)
+
+      if (response.code.to_i >= 200 && response.code.to_i <= 300) && payload["error"].nil?
+        payload
+      else
+        raise AccessTokenDeniedError.new(payload["error_description"])
+      end
     end
 
     def handle_error(error)
