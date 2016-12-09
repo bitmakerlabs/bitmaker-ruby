@@ -3,8 +3,6 @@ require 'net/http'
 require 'multi_json'
 require 'jwt'
 
-# TODO raise MissingClientCredentialsError if missing client_id and client_secret
-
 module Bitmaker
   class Client
     class MissingClientCredentialsError < RuntimeError; end
