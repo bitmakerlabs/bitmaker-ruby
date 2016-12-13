@@ -2,6 +2,8 @@ require 'uri'
 require 'net/http'
 require 'multi_json'
 require 'jwt'
+require 'active_support'
+require 'active_support/core_ext/string/inflections'
 
 module Bitmaker
   class Client
@@ -31,20 +33,11 @@ module Bitmaker
 
       raise MissingClientCredentialsError.new('You must provide a valid client_id and client_secret') if @client_id.nil? && @client_secret.nil?
 
-      ensure_valid_access_token
-    end
-
-    protected
-    def set_access_token
+      # TODO: Only fetch new token when expired (maybe?)
       @access_token = fetch_access_token["access_token"]
     end
 
-    def ensure_valid_access_token
-      set_access_token if !access_token
-
-      @access_token
-    end
-
+    protected
     def fetch_access_token
       http = Net::HTTP.new(AUTH_URL.host, AUTH_URL.port)
       http.use_ssl = SSL
