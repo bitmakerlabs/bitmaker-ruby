@@ -4,9 +4,11 @@ require 'bitmaker'
 require 'minitest/spec'
 require 'minitest/reporters'
 require 'minitest/autorun'
+require 'minitest/byebug' if ENV['DEBUG']
 
 require 'webmock/minitest'
 require 'timecop'
+
 
 Minitest::Reporters.use! Minitest::Reporters::SpecReporter.new
 

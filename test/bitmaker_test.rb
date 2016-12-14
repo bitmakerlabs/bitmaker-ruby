@@ -85,4 +85,43 @@ describe Bitmaker do
       error.message.wont_be_nil
     end
   end
+
+  describe Bitmaker::WebsiteActivity do
+    let(:activity) {
+      activity = Bitmaker::WebsiteActivity.new(inquiry_type: 'general',
+                                                first_name: 'Fred',
+                                                last_name: 'Flintstone',
+                                                email: 'fred@flintstone.com')
+
+    }
+
+    it "whitelists attributes" do
+      activity = Bitmaker::WebsiteActivity.new(inquiry_type: 'general', random_attribute: 'blacklisted')
+      activity.inquiry_type.must_equal 'general'
+      activity.random_attribute.must_be_nil
+    end
+
+    it "sets the lead accessor to a valid Lead" do
+      activity.lead.wont_be_nil
+      activity.lead.must_be_instance_of Bitmaker::Lead
+      activity.lead.first_name.must_equal "Fred"
+      activity.lead.last_name.must_equal "Flintstone"
+      activity.lead.email.must_equal "fred@flintstone.com"
+    end
+
+    it "should serialize to a Hash" do
+      serialized = activity.serialize(included_models: ['lead'])
+      serialized.must_be_instance_of Hash
+    end
+
+    it "should serialize in json-api format" do
+      serialized = activity.serialize(included_models: ['lead'])
+      serialized.dig('data').must_be_instance_of Hash
+      serialized.dig('data', 'attributes', 'inquiry_type').must_equal 'general'
+      serialized.dig('data', 'relationships', 'lead', 'data', 'type').must_equal 'leads'
+      serialized.dig('included').must_be_instance_of Array
+      serialized.dig('included').first.dig('type').must_equal 'leads'
+      serialized.dig('included').first.dig('attributes', 'email').must_equal 'fred@flintstone.com'
+    end
+  end
 end

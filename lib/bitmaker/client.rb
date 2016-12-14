@@ -10,12 +10,15 @@ module Bitmaker
     class MissingClientCredentialsError < RuntimeError; end
     class AccessTokenDeniedError < RuntimeError; end
 
+    AUTH_URL = URI('https://bitmaker.auth0.com/oauth/token')
     IDENTIFIER = 'https://api.bitmaker.co'
     HOST = 'api.bitmaker.co'
     PORT = 443
     SSL = true
-    HEADERS = { :accept => 'application/json' }
-    AUTH_URL = URI('https://bitmaker.auth0.com/oauth/token')
+    HEADERS = {
+      "Accept" => 'application/vnd.api+json',
+      "User-Agent" => "Bitmaker/v1 Ruby/#{VERSION}"
+    }
 
     attr_reader :access_token
 
@@ -62,8 +65,18 @@ module Bitmaker
       end
     end
 
-    def handle_error(error)
-      set_access_token if error.is_a?(JWT::ExpiredSignature)
+    def request(method, path, body = nil)
+      uri = URI.join(DEFAULT_BASE_URI, path)
+
+      session = Net::HTTP.new(uri.host, uri.port)
+      session.use_ssl = (uri.scheme == 'https')
+      session.open_timeout = DEFAULT_TIMEOUT
+      session.read_timeout = DEFAULT_TIMEOUT
+
+      request = Net::HTTP::Post.new(uri.path)
+      request.initialize_http_header(HEADERS)
+
+      # Set Content-Type when there's a body
     end
   end
 end

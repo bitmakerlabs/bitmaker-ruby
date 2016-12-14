@@ -38,4 +38,5 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "minitest-reporters", "~> 1.1"
   spec.add_development_dependency "webmock", "~> 2.1"
   spec.add_development_dependency "timecop", "~> 0.8"
+  spec.add_development_dependency "minitest-byebug"
 end
