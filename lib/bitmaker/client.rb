@@ -2,19 +2,23 @@ require 'uri'
 require 'net/http'
 require 'multi_json'
 require 'jwt'
-require 'active_support'
-require 'active_support/core_ext/string/inflections'
 
 module Bitmaker
   class Client
     class MissingClientCredentialsError < RuntimeError; end
     class AccessTokenDeniedError < RuntimeError; end
+    class HttpResponseError < RuntimeError
+      attr_reader :response
+
+      def initialize(message, response)
+        @message = message
+        @response = response
+      end
+    end
 
     AUTH_URL = URI('https://bitmaker.auth0.com/oauth/token')
-    IDENTIFIER = 'https://api.bitmaker.co'
-    HOST = 'api.bitmaker.co'
-    PORT = 443
-    SSL = true
+    DEFAULT_BASE_URI = 'https://api.bitmaker.co'
+    DEFAULT_TIMEOUT = 10
     HEADERS = {
       "Accept" => 'application/vnd.api+json',
       "User-Agent" => "Bitmaker/v1 Ruby/#{VERSION}"
@@ -40,10 +44,20 @@ module Bitmaker
       @access_token = fetch_access_token["access_token"]
     end
 
+    def create(resource_name, payload)
+      resource_class = "Bitmaker::#{resource_name.to_s.classify}".constantize
+      resource = resource_class.new(payload)
+
+      # send the request
+      response = request(:post, resource.create_path, payload)
+
+      resource
+    end
+
     protected
     def fetch_access_token
       http = Net::HTTP.new(AUTH_URL.host, AUTH_URL.port)
-      http.use_ssl = SSL
+      http.use_ssl = true
       http.verify_mode = OpenSSL::SSL::VERIFY_NONE
 
       request = Net::HTTP::Post.new(AUTH_URL)
@@ -52,7 +66,7 @@ module Bitmaker
                                       grant_type: 'client_credentials',
                                       client_id: @client_id,
                                       client_secret: @client_secret,
-                                      audience: IDENTIFIER
+                                      audience: DEFAULT_BASE_URI
                                     })
 
       response = http.request(request)
@@ -68,15 +82,42 @@ module Bitmaker
     def request(method, path, body = nil)
       uri = URI.join(DEFAULT_BASE_URI, path)
 
-      session = Net::HTTP.new(uri.host, uri.port)
-      session.use_ssl = (uri.scheme == 'https')
-      session.open_timeout = DEFAULT_TIMEOUT
-      session.read_timeout = DEFAULT_TIMEOUT
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = (uri.scheme == 'https')
+      http.open_timeout = DEFAULT_TIMEOUT
+      http.read_timeout = DEFAULT_TIMEOUT
 
-      request = Net::HTTP::Post.new(uri.path)
+      request = request_class(method).new(uri.path)
       request.initialize_http_header(HEADERS)
 
       # Set Content-Type when there's a body
+      unless body.nil?
+        request.add_field('Content-Type', 'application/vnd.api+json')
+        request.body = MultiJson.dump(body)
+      end
+
+      response = http.request(request)
+
+      if response.code.to_i >= 200 && response.code.to_i < 300
+        response
+      else
+        raise HttpResponseError.new("Bitmaker API returned an error response: #{response.code}", response)
+      end
+    end
+
+    def request_class(method)
+      case method
+      when :post
+        Net::HTTP::Post
+      when :patch
+        Net::HTTP::Patch
+      when :put
+        Net::HTTP::Put
+      when :delete
+        Net::HTTP::Delete
+      else
+        raise InvalidRequest.new("Invalid request method #{method.inspect}")
+      end
     end
   end
 end

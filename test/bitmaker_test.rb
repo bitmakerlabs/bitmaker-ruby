@@ -7,7 +7,7 @@ describe Bitmaker do
   let(:body) { { grant_type: 'client_credentials',
                   client_id: 'CLIENT_ID',
                   client_secret: 'CLIENT_SECRET',
-                  audience: Bitmaker::Client::IDENTIFIER } }
+                  audience: Bitmaker::Client::DEFAULT_BASE_URI } }
 
   def json(data)
     MultiJson.dump(data)
@@ -86,6 +86,59 @@ describe Bitmaker do
     end
   end
 
+  describe '#create' do
+    let(:activity_params) {
+      {
+        inquiry_type: 'general',
+        first_name: 'Fred',
+        last_name: 'Flintstone',
+        email: 'fred@flintstone.com'
+      }
+    }
+
+    before do
+      generate_access_token
+
+      stub_request(:post, Bitmaker::Client::AUTH_URL.to_s)
+        .with(
+          body: json(body),
+          headers: { 'content-type' => 'application/json' })
+        .to_return(status: 200, body: json(@access_token) )
+
+      @stub_create = stub_request(:post, Bitmaker::Client::DEFAULT_BASE_URI + '/api/v1/website_activities')
+        .with(
+          body: json(activity_params),
+          headers: { 'Content-Type' => 'application/vnd.api+json' })
+        .to_return(status: 201)
+
+        Bitmaker::Client.client_id = "CLIENT_ID"
+        Bitmaker::Client.client_secret = "CLIENT_SECRET"
+
+        @client = Bitmaker::Client.new
+    end
+
+    it "should return a WebsiteActivity given good params" do
+      @client.create(:website_activities, activity_params).must_be_instance_of Bitmaker::WebsiteActivity
+    end
+
+    it "should return a well-formed WebsiteActivity" do
+      website_activity = @client.create(:website_activities, activity_params)
+      website_activity.inquiry_type.must_equal "general"
+      website_activity.lead.must_be_instance_of Bitmaker::Lead
+      website_activity.lead.first_name.must_equal 'Fred'
+      website_activity.lead.last_name.must_equal 'Flintstone'
+    end
+
+    it "should send a POST request to API with good params" do
+      @client.create(:website_activities, activity_params)
+      assert_requested @stub_create
+    end
+
+    it "should raise a NameError on a bad resource name" do
+      -> { @client.create(:fake_resource, activity_params) }.must_raise NameError
+    end
+  end
+
   describe Bitmaker::WebsiteActivity do
     let(:activity) {
       activity = Bitmaker::WebsiteActivity.new(inquiry_type: 'general',
@@ -122,6 +175,10 @@ describe Bitmaker do
       serialized.dig('included').must_be_instance_of Array
       serialized.dig('included').first.dig('type').must_equal 'leads'
       serialized.dig('included').first.dig('attributes', 'email').must_equal 'fred@flintstone.com'
+    end
+
+    it "should return the correct create_path" do
+      activity.create_path.must_equal '/api/v1/website_activities'
     end
   end
 end
