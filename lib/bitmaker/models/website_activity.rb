@@ -1,5 +1,5 @@
 module Bitmaker
-  class WebsiteActivity < Model
+  class Inquiry < Model
     attr_reader :lead
 
     ATTRIBUTES = [:inquiry_type,

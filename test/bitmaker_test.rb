@@ -105,7 +105,7 @@ describe Bitmaker do
           headers: { 'content-type' => 'application/json' })
         .to_return(status: 200, body: json(@access_token) )
 
-      @stub_create = stub_request(:post, Bitmaker::Client::DEFAULT_BASE_URI + '/api/v1/website_activities')
+      @stub_create = stub_request(:post, Bitmaker::Client::DEFAULT_BASE_URI + '/api/v1/inquiries')
         .with(
           body: json(activity_params),
           headers: { 'Content-Type' => 'application/vnd.api+json' })
@@ -117,20 +117,20 @@ describe Bitmaker do
         @client = Bitmaker::Client.new
     end
 
-    it "should return a WebsiteActivity given good params" do
-      @client.create(:website_activities, activity_params).must_be_instance_of Bitmaker::WebsiteActivity
+    it "should return a Inquiry given good params" do
+      @client.create(:inquiries, activity_params).must_be_instance_of Bitmaker::Inquiry
     end
 
-    it "should return a well-formed WebsiteActivity" do
-      website_activity = @client.create(:website_activities, activity_params)
-      website_activity.inquiry_type.must_equal "general"
-      website_activity.lead.must_be_instance_of Bitmaker::Lead
-      website_activity.lead.first_name.must_equal 'Fred'
-      website_activity.lead.last_name.must_equal 'Flintstone'
+    it "should return a well-formed Inquiry" do
+      inquiry = @client.create(:inquiries, activity_params)
+      inquiry.inquiry_type.must_equal "general"
+      inquiry.lead.must_be_instance_of Bitmaker::Lead
+      inquiry.lead.first_name.must_equal 'Fred'
+      inquiry.lead.last_name.must_equal 'Flintstone'
     end
 
     it "should send a POST request to API with good params" do
-      @client.create(:website_activities, activity_params)
+      @client.create(:inquiries, activity_params)
       assert_requested @stub_create
     end
 
@@ -139,9 +139,9 @@ describe Bitmaker do
     end
   end
 
-  describe Bitmaker::WebsiteActivity do
+  describe Bitmaker::Inquiry do
     let(:activity) {
-      activity = Bitmaker::WebsiteActivity.new(inquiry_type: 'general',
+      activity = Bitmaker::Inquiry.new(inquiry_type: 'general',
                                                 first_name: 'Fred',
                                                 last_name: 'Flintstone',
                                                 email: 'fred@flintstone.com')
@@ -149,7 +149,7 @@ describe Bitmaker do
     }
 
     it "whitelists attributes" do
-      activity = Bitmaker::WebsiteActivity.new(inquiry_type: 'general', random_attribute: 'blacklisted')
+      activity = Bitmaker::Inquiry.new(inquiry_type: 'general', random_attribute: 'blacklisted')
       activity.inquiry_type.must_equal 'general'
       activity.random_attribute.must_be_nil
     end
@@ -178,7 +178,7 @@ describe Bitmaker do
     end
 
     it "should return the correct create_path" do
-      activity.create_path.must_equal '/api/v1/website_activities'
+      activity.create_path.must_equal '/api/v1/inquiries'
     end
   end
 end

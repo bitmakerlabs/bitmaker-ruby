@@ -1,5 +1,5 @@
 module Bitmaker
-  class WebsiteActivitySerializer < BaseSerializer
+  class InquirySerializer < BaseSerializer
     attributes  :inquiry_type,
                 :questions,
                 :bitmaker_reason,
