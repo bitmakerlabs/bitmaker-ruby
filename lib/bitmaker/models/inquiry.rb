@@ -17,5 +17,9 @@ module Bitmaker
       super(attributes)
       @lead = Lead.new(attributes)
     end
+
+    def resource_path
+      'activities/inquiries'
+    end
   end
 end

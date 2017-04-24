@@ -105,7 +105,7 @@ describe Bitmaker do
           headers: { 'content-type' => 'application/json' })
         .to_return(status: 200, body: json(@access_token) )
 
-      @stub_create = stub_request(:post, Bitmaker::Client::DEFAULT_BASE_URI + '/api/v1/inquiries')
+      @stub_create = stub_request(:post, Bitmaker::Client::DEFAULT_BASE_URI + '/v1/activities/inquiries')
         .with(
           body: json(activity_params),
           headers: { 'Content-Type' => 'application/vnd.api+json' })
@@ -178,7 +178,7 @@ describe Bitmaker do
     end
 
     it "should return the correct create_path" do
-      activity.create_path.must_equal '/api/v1/inquiries'
+      activity.create_path.must_equal '/v1/activities/inquiries'
     end
   end
 end
