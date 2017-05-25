@@ -54,7 +54,9 @@ module Bitmaker
       resource
     end
 
+
     protected
+
     def fetch_access_token
       http = Net::HTTP.new(AUTH_URL.host, AUTH_URL.port)
       http.use_ssl = true
