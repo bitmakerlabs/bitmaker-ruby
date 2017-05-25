@@ -49,7 +49,7 @@ module Bitmaker
       resource = resource_class.new(payload)
 
       # send the request
-      response = request(:post, resource.create_path, payload)
+      request(:post, resource.create_path, payload)
 
       resource
     end

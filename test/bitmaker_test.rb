@@ -141,11 +141,10 @@ describe Bitmaker do
 
   describe Bitmaker::Inquiry do
     let(:activity) {
-      activity = Bitmaker::Inquiry.new(inquiry_type: 'general',
-                                                first_name: 'Fred',
-                                                last_name: 'Flintstone',
-                                                email: 'fred@flintstone.com')
-
+      Bitmaker::Inquiry.new(inquiry_type: 'general',
+                            first_name: 'Fred',
+                            last_name: 'Flintstone',
+                            email: 'fred@flintstone.com')
     }
 
     it "whitelists attributes" do
