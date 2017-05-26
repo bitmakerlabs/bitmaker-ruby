@@ -5,141 +5,177 @@ describe Bitmaker do
   let (:client_id) { 'CLIENT_ID' }
   let (:client_secret) { 'CLIENT_SECRET' }
   let(:body) { { grant_type: 'client_credentials',
-                  client_id: 'CLIENT_ID',
-                  client_secret: 'CLIENT_SECRET',
+                  client_id: client_id,
+                  client_secret: client_secret,
                   audience: Bitmaker::Client::DEFAULT_BASE_URI } }
+  let(:expiry) { Time.now.utc + 1.week }
 
   def json(data)
     MultiJson.dump(data)
   end
 
-  def generate_access_token
+  def generate_access_token(expiry:)
     rsa_private = OpenSSL::PKey::RSA.generate 2048
-    token = JWT.encode({"exp": (Time.now.utc + 1.day).to_i}, rsa_private, 'RS256')
+    token = JWT.encode({"exp": expiry.to_i}, rsa_private, 'RS256')
 
     @public_key = rsa_private.public_key
     @access_token = { access_token: token, token_type: 'Bearer' }
   end
 
-  it 'raises an exception when no credentials provided' do
-    Bitmaker::Client.client_id = nil
-    Bitmaker::Client.client_secret = nil
-
-    -> { Bitmaker::Client.new }.must_raise Bitmaker::Client::MissingClientCredentialsError
-  end
-
-  describe 'getting access token' do
+  describe 'Client' do
     before do
-      # A time between the issued and expiry for the access_token
-      Timecop.freeze(Time.at(1479957567))
-
-      generate_access_token
-
-      stub_request(:post, Bitmaker::Client::AUTH_URL.to_s)
-        .with(
-          body: json(body),
-          headers: { 'content-type' => 'application/json' })
-        .to_return(status: 200, body: json(@access_token) )
+      generate_access_token(expiry: expiry)
+      Bitmaker::Client.any_instance.stubs(:fetch_public_key).returns(@public_key)
     end
 
-    after do
-      Timecop.return
+    it 'raises an exception when no credentials provided' do
+      Bitmaker::Client.client_id = nil
+      Bitmaker::Client.client_secret = nil
+
+      -> { Bitmaker::Client.new }.must_raise Bitmaker::Client::MissingClientCredentialsError
     end
 
-    describe 'when credentials set on instance' do
-      it "fetches an access token on initialization" do
-        client = Bitmaker::Client.new(client_id: "CLIENT_ID", client_secret: "CLIENT_SECRET")
-        client.access_token.must_equal @access_token[:access_token]
-      end
-    end
-
-    describe 'when credentials set on class' do
+    describe 'getting access token' do
       before do
-        Bitmaker::Client.client_id = "CLIENT_ID"
-        Bitmaker::Client.client_secret = "CLIENT_SECRET"
+        stub_request(:post, Bitmaker::Client::AUTH_URL.to_s)
+          .with(
+            body: json(body),
+            headers: { 'content-type' => 'application/json' })
+          .to_return(status: 200, body: json(@access_token) )
       end
 
-      it "fetches an access token on initialization" do
-        client = Bitmaker::Client.new
-        client.access_token.must_equal @access_token[:access_token]
+      describe 'when credentials set on instance' do
+        it "fetches an access token on initialization" do
+          client = Bitmaker::Client.new(client_id: client_id, client_secret: client_secret)
+          client.access_token.must_equal @access_token[:access_token]
+        end
+      end
+
+      describe 'when credentials set on class' do
+        before do
+          Bitmaker::Client.client_id = client_id
+          Bitmaker::Client.client_secret = client_secret
+          @client = Bitmaker::Client.new
+        end
+
+        it "fetches an access token on initialization" do
+          @client.access_token.must_equal @access_token[:access_token]
+        end
+
+        it 'sets the access token expiry' do
+          @client.access_token_expiry.wont_be_nil
+        end
+
+        it 'sets the access token expiry to match the access token payload' do
+          @client.access_token_expiry.must_be_within_delta expiry, 1.second
+        end
       end
     end
-  end
 
-  describe 'getting error from Auth0' do
-    let(:error) { { error: "access_denied",
-                    error_description: "Client is not authorized to access \"https://api.bitmaker.co\". You might probably want to create a \"client-grant\" associated to this API. See: https://auth0.com/docs/api/v2#!/Client_Grants/post_client_grants"} }
-    before do
-      stub_request(:post, Bitmaker::Client::AUTH_URL.to_s)
-        .with(
-          body: json(body),
-          headers: { 'content-type' => 'application/json' })
-        .to_return(status: 503, body: json(error) )
+    describe 'getting error from Auth0' do
+      let(:error) { { error: "access_denied",
+                      error_description: "Client is not authorized to access \"https://api.bitmaker.co\". You might probably want to create a \"client-grant\" associated to this API. See: https://auth0.com/docs/api/v2#!/Client_Grants/post_client_grants"} }
+      before do
+        stub_request(:post, Bitmaker::Client::AUTH_URL.to_s)
+          .with(
+            body: json(body),
+            headers: { 'content-type' => 'application/json' })
+          .to_return(status: 503, body: json(error) )
 
-        Bitmaker::Client.client_id = "CLIENT_ID"
-        Bitmaker::Client.client_secret = "CLIENT_SECRET"
+          Bitmaker::Client.client_id = client_id
+          Bitmaker::Client.client_secret = client_secret
+      end
+
+      it "raises an exception with error message" do
+        error = -> { Bitmaker::Client.new }.must_raise Bitmaker::Client::AccessTokenDeniedError
+        error.message.wont_be_nil
+      end
     end
 
-    it "raises an exception with error message" do
-      error = -> { Bitmaker::Client.new }.must_raise Bitmaker::Client::AccessTokenDeniedError
-      error.message.wont_be_nil
-    end
-  end
-
-  describe '#create' do
-    let(:activity_params) {
-      {
-        inquiry_type: 'general',
-        first_name: 'Fred',
-        last_name: 'Flintstone',
-        email: 'fred@flintstone.com'
+    describe '#create' do
+      let(:activity_params) {
+        {
+          inquiry_type: 'general',
+          first_name: 'Fred',
+          last_name: 'Flintstone',
+          email: 'fred@flintstone.com'
+        }
       }
-    }
 
-    before do
-      generate_access_token
+      before do
+        stub_request(:post, Bitmaker::Client::AUTH_URL.to_s)
+          .with(
+            body: json(body),
+            headers: { 'content-type' => 'application/json' })
+          .to_return(status: 200, body: json(@access_token) )
 
-      stub_request(:post, Bitmaker::Client::AUTH_URL.to_s)
-        .with(
-          body: json(body),
-          headers: { 'content-type' => 'application/json' })
-        .to_return(status: 200, body: json(@access_token) )
+        @stub_create = stub_request(:post, Bitmaker::Client::DEFAULT_BASE_URI + '/v1/activities/inquiries')
+          .with(
+            body: json(activity_params),
+            headers: { 'Content-Type' => 'application/vnd.api+json' })
+          .to_return(status: 201)
 
-      @stub_create = stub_request(:post, Bitmaker::Client::DEFAULT_BASE_URI + '/v1/activities/inquiries')
-        .with(
-          body: json(activity_params),
-          headers: { 'Content-Type' => 'application/vnd.api+json' })
-        .to_return(status: 201)
-
-        Bitmaker::Client.client_id = "CLIENT_ID"
-        Bitmaker::Client.client_secret = "CLIENT_SECRET"
+        Bitmaker::Client.client_id = client_id
+        Bitmaker::Client.client_secret = client_secret
 
         @client = Bitmaker::Client.new
-    end
+      end
 
-    it "should return a Inquiry given good params" do
-      @client.create(:inquiries, activity_params).must_be_instance_of Bitmaker::Inquiry
-    end
+      it "should set the Authorization header on each request" do
+        @client.create(:inquiries, activity_params)
+        assert_requested(:post, Bitmaker::Client::DEFAULT_BASE_URI + '/v1/activities/inquiries', times: 1) do |req|
+          req.headers.must_include 'Authorization'
+          req.headers['Authorization'].must_equal "Bearer #{@access_token[:access_token]}"
+        end
+      end
 
-    it "should return a well-formed Inquiry" do
-      inquiry = @client.create(:inquiries, activity_params)
-      inquiry.inquiry_type.must_equal "general"
-      inquiry.lead.must_be_instance_of Bitmaker::Lead
-      inquiry.lead.first_name.must_equal 'Fred'
-      inquiry.lead.last_name.must_equal 'Flintstone'
-    end
+      it "should return a Inquiry given good params" do
+        @client.create(:inquiries, activity_params).must_be_instance_of Bitmaker::Inquiry
+      end
 
-    it "should send a POST request to API with good params" do
-      @client.create(:inquiries, activity_params)
-      assert_requested @stub_create
-    end
+      it "should return a well-formed Inquiry" do
+        inquiry = @client.create(:inquiries, activity_params)
+        inquiry.inquiry_type.must_equal "general"
+        inquiry.lead.must_be_instance_of Bitmaker::Lead
+        inquiry.lead.first_name.must_equal 'Fred'
+        inquiry.lead.last_name.must_equal 'Flintstone'
+      end
 
-    it "should raise a NameError on a bad resource name" do
-      -> { @client.create(:fake_resource, activity_params) }.must_raise NameError
+      it "should send a POST request to API with good params" do
+        @client.create(:inquiries, activity_params)
+        assert_requested @stub_create
+      end
+
+      it "should raise a NameError on a bad resource name" do
+        -> { @client.create(:fake_resource, activity_params) }.must_raise NameError
+      end
+
+      describe 'when access token is close to expiry' do
+        before do
+          @expiry = Time.now.utc + 15.minutes
+
+          generate_access_token(expiry: @expiry)
+
+          Bitmaker::Client.any_instance.stubs(:fetch_public_key).returns(@public_key)
+
+          stub_request(:post, Bitmaker::Client::AUTH_URL.to_s)
+            .with(
+              body: json(body),
+              headers: { 'content-type' => 'application/json' })
+            .to_return(status: 200, body: json(@access_token) )
+
+          @client = Bitmaker::Client.new
+        end
+
+        it 'should fetch a new access token' do
+          @client.expects(:set_access_token)
+          @client.create(:inquiries, activity_params)
+        end
+      end
     end
   end
 
-  describe Bitmaker::Inquiry do
+  describe 'Inquiry' do
     let(:activity) {
       Bitmaker::Inquiry.new(inquiry_type: 'general',
                             first_name: 'Fred',
