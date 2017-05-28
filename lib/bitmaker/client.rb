@@ -10,8 +10,7 @@ module Bitmaker
     class HttpResponseError < RuntimeError
       attr_reader :response
 
-      def initialize(message, response)
-        @message = message
+      def initialize(response)
         @response = response
       end
     end
@@ -121,7 +120,7 @@ module Bitmaker
       if response.code.to_i >= 200 && response.code.to_i < 300
         response
       else
-        raise HttpResponseError.new("Bitmaker API returned an error response: #{response.code}", response)
+        raise HttpResponseError.new(response), "Bitmaker API returned an error response: #{response.code} #{response.message}"
       end
     end
 
