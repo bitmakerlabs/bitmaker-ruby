@@ -8,7 +8,7 @@ describe Bitmaker do
                   client_id: client_id,
                   client_secret: client_secret,
                   audience: Bitmaker::Client::DEFAULT_BASE_URI } }
-  let(:expiry) { Time.now.utc + 1.week }
+  let(:expiry) { Time.now.utc + 1.day }
 
   def json(data)
     MultiJson.dump(data)
@@ -19,13 +19,12 @@ describe Bitmaker do
     token = JWT.encode({"exp": expiry.to_i}, rsa_private, 'RS256')
 
     @public_key = rsa_private.public_key
-    @access_token = { access_token: token, token_type: 'Bearer' }
+    @access_token = { access_token: token, expires_in: expiry.to_i - Time.now.utc.to_i, token_type: 'Bearer' }
   end
 
   describe 'Client' do
     before do
       generate_access_token(expiry: expiry)
-      Bitmaker::Client.any_instance.stubs(:fetch_public_key).returns(@public_key)
     end
 
     it 'raises an exception when no credentials provided' do
@@ -155,8 +154,6 @@ describe Bitmaker do
           @expiry = Time.now.utc + 15.minutes
 
           generate_access_token(expiry: @expiry)
-
-          Bitmaker::Client.any_instance.stubs(:fetch_public_key).returns(@public_key)
 
           stub_request(:post, Bitmaker::Client::AUTH_URL.to_s)
             .with(
