@@ -21,5 +21,9 @@ module Bitmaker
     def resource_path
       'activities/inquiries'
     end
+
+    def serialize(included_models: [])
+      super(included_models: (included_models << 'lead').uniq)
+    end
   end
 end
