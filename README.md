@@ -20,7 +20,13 @@ Or install it yourself as:
 
 ## Usage
 
-TODO: Write usage instructions here
+To use this gem, you first need to instantiate the `Bitmaker::Client`. It's probably best to do this in a Rails initializer:
+
+```ruby
+# In config/initializers/bitmaker.rb
+$bitmaker = Bitmaker::Client.new(ENV['AUTH0_CLIENT_ID'], ENV['AUTH0_CLIENT_SECRET'])
+```
+As you can see from the above, you must provide the `client_id` and `client_secret` for your application. To get these values, you must register your client app on Auth0.
 
 ## Development
 
