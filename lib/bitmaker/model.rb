@@ -6,7 +6,7 @@ module Bitmaker
     API_ROOT = '/v1'
 
     def initialize(attributes)
-      whitelist = attributes.select { |k, v| self.class::ATTRIBUTES.include?(k) } if self.class::ATTRIBUTES.size > 0
+      whitelist = attributes.select { |k, v| self.class::ATTRIBUTES.include?(k.to_sym) } if self.class::ATTRIBUTES.size > 0
       super(whitelist)
     end
 
