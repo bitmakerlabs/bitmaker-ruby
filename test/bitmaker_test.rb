@@ -109,10 +109,7 @@ describe Bitmaker do
           .to_return(status: 200, body: json(@access_token) )
 
         @stub_create = stub_request(:post, Bitmaker::Client::DEFAULT_BASE_URI + '/v1/activities/inquiries')
-          .with(
-            body: json(activity_params),
-            headers: { 'Content-Type' => 'application/vnd.api+json' })
-          .to_return(status: 201)
+                        .to_return(status: 201)
 
         Bitmaker::Client.client_id = client_id
         Bitmaker::Client.client_secret = client_secret
@@ -120,11 +117,31 @@ describe Bitmaker do
         @client = Bitmaker::Client.new
       end
 
+      it "should send a POST request to API with good params" do
+        @client.create(:inquiries, activity_params)
+        assert_requested @stub_create
+      end
+
       it "should set the Authorization header on each request" do
         @client.create(:inquiries, activity_params)
         assert_requested(:post, Bitmaker::Client::DEFAULT_BASE_URI + '/v1/activities/inquiries', times: 1) do |req|
           req.headers.must_include 'Authorization'
           req.headers['Authorization'].must_equal "Bearer #{@access_token[:access_token]}"
+        end
+      end
+
+      it "should set the json-api header on each request" do
+        @client.create(:inquiries, activity_params)
+        assert_requested(:post, Bitmaker::Client::DEFAULT_BASE_URI + '/v1/activities/inquiries', times: 1) do |req|
+          req.headers.must_include 'Content-Type'
+          req.headers['Content-Type'].must_equal 'application/vnd.api+json'
+        end
+      end
+
+      it "should set the body to a json-api serialized Inquiry" do
+        @client.create(:inquiries, activity_params)
+        assert_requested(:post, Bitmaker::Client::DEFAULT_BASE_URI + '/v1/activities/inquiries', times: 1) do |req|
+          req.body.must_equal json(Bitmaker::Inquiry.new(activity_params).serialize)
         end
       end
 
@@ -138,11 +155,6 @@ describe Bitmaker do
         inquiry.lead.must_be_instance_of Bitmaker::Lead
         inquiry.lead.first_name.must_equal 'Fred'
         inquiry.lead.last_name.must_equal 'Flintstone'
-      end
-
-      it "should send a POST request to API with good params" do
-        @client.create(:inquiries, activity_params)
-        assert_requested @stub_create
       end
 
       it "should raise a NameError on a bad resource name" do
