@@ -8,6 +8,8 @@ module Bitmaker
                   :course_reason,
                   :current_occupation,
                   :course_name,
+                  :course_code,
+                  :cohort_start_date,
                   :unbounce_campaign,
                   :utm,
                   :basecrm_resource_id,
