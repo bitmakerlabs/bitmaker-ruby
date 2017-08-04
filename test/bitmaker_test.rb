@@ -34,63 +34,6 @@ describe Bitmaker do
       -> { Bitmaker::Client.new }.must_raise Bitmaker::Client::MissingClientCredentialsError
     end
 
-    describe 'getting access token' do
-      before do
-        stub_request(:post, Bitmaker::Client::AUTH_URL.to_s)
-          .with(
-            body: json(body),
-            headers: { 'content-type' => 'application/json' })
-          .to_return(status: 200, body: json(@access_token) )
-      end
-
-      describe 'when credentials set on instance' do
-        it "fetches an access token on initialization" do
-          client = Bitmaker::Client.new(client_id: client_id, client_secret: client_secret)
-          client.access_token.must_equal @access_token[:access_token]
-        end
-      end
-
-      describe 'when credentials set on class' do
-        before do
-          Bitmaker::Client.client_id = client_id
-          Bitmaker::Client.client_secret = client_secret
-          @client = Bitmaker::Client.new
-        end
-
-        it "fetches an access token on initialization" do
-          @client.access_token.must_equal @access_token[:access_token]
-        end
-
-        it 'sets the access token expiry' do
-          @client.access_token_expiry.wont_be_nil
-        end
-
-        it 'sets the access token expiry to match the access token payload' do
-          @client.access_token_expiry.must_be_within_delta expiry, 1.second
-        end
-      end
-    end
-
-    describe 'getting error from Auth0' do
-      let(:error) { { error: "access_denied",
-                      error_description: "Client is not authorized to access \"https://api.bitmaker.co\". You might probably want to create a \"client-grant\" associated to this API. See: https://auth0.com/docs/api/v2#!/Client_Grants/post_client_grants"} }
-      before do
-        stub_request(:post, Bitmaker::Client::AUTH_URL.to_s)
-          .with(
-            body: json(body),
-            headers: { 'content-type' => 'application/json' })
-          .to_return(status: 503, body: json(error) )
-
-          Bitmaker::Client.client_id = client_id
-          Bitmaker::Client.client_secret = client_secret
-      end
-
-      it "raises an exception with error message" do
-        error = -> { Bitmaker::Client.new }.must_raise Bitmaker::Client::AccessTokenDeniedError
-        error.message.wont_be_nil
-      end
-    end
-
     describe '#create' do
       let(:activity_params) {
         {
@@ -115,6 +58,36 @@ describe Bitmaker do
         Bitmaker::Client.client_secret = client_secret
 
         @client = Bitmaker::Client.new
+      end
+
+      describe 'getting access token' do
+        describe 'when credentials set on instance' do
+          it "fetches an access token on initialization" do
+            client = Bitmaker::Client.new(client_id: client_id, client_secret: client_secret)
+
+            client.create(:inquiries, activity_params)
+
+            client.access_token.must_equal @access_token[:access_token]
+          end
+        end
+
+        describe 'when credentials set on class' do
+          before do
+            @client.create(:inquiries, activity_params)
+          end
+
+          it "fetches an access token on initialization" do
+            @client.access_token.must_equal @access_token[:access_token]
+          end
+
+          it 'sets the access token expiry' do
+            @client.access_token_expiry.wont_be_nil
+          end
+
+          it 'sets the access token expiry to match the access token payload' do
+            @client.access_token_expiry.must_be_within_delta expiry, 1.second
+          end
+        end
       end
 
       it "should send a POST request to API with good params" do
@@ -179,6 +152,28 @@ describe Bitmaker do
         it 'should fetch a new access token' do
           @client.expects(:set_access_token)
           @client.create(:inquiries, activity_params)
+        end
+
+        describe 'getting error from Auth0' do
+          let(:error) { { error: "access_denied",
+                          error_description: "Client is not authorized to access \"https://api.bitmaker.co\". You might probably want to create a \"client-grant\" associated to this API. See: https://auth0.com/docs/api/v2#!/Client_Grants/post_client_grants"} }
+          before do
+            stub_request(:post, Bitmaker::Client::AUTH_URL.to_s)
+              .with(
+                body: json(body),
+                headers: { 'content-type' => 'application/json' })
+              .to_return(status: 503, body: json(error) )
+
+              Bitmaker::Client.client_id = client_id
+              Bitmaker::Client.client_secret = client_secret
+
+              @client = Bitmaker::Client.new
+          end
+
+          it "raises an exception with error message" do
+            error = -> { @client.create(:inquiries, activity_params) }.must_raise Bitmaker::Client::AccessTokenDeniedError
+            error.message.wont_be_nil
+          end
         end
       end
     end

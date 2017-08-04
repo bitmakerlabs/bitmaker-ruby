@@ -39,8 +39,6 @@ module Bitmaker
       @client_secret = client_secret || self.class.client_secret || ENV['AUTH0_CLIENT_SECRET']
 
       raise MissingClientCredentialsError.new('You must provide a valid client_id and client_secret') if @client_id.nil? && @client_secret.nil?
-
-      set_access_token
     end
 
     def create(resource_name, payload)
@@ -81,7 +79,9 @@ module Bitmaker
     end
 
     def request(method, path, body = nil)
-      set_access_token if (Time.now.utc + (60 * 60)) > @access_token_expiry
+      set_access_token if @access_token.nil? ||
+                          @access_token_expiry.nil? ||
+                          (Time.now.utc + (60 * 60)) > @access_token_expiry
 
       uri = URI.join(ENV['bitmaker_base_uri'] || DEFAULT_BASE_URI, path)
 
